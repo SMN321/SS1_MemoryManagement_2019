@@ -16,34 +16,45 @@ char delta16[] = {0, 3, 4, 3, 5, 3, 4, 3, 6, 3, 4, 3, 5, 3, 4, 3};
 char delta32[] = {0, 7, 8, 7, 9, 7, 8, 7};
 char delta64[] = {0, 15, 16, 15};
 char delta128[] = {0, 31};
+char delta256[] = {0};
 //length of the delta arrays, computed in init_my_alloc for better performance
-char delta8_len, delta16_len, delta32_len, delta64_len, delta128_len;
+unsigned char delta8_len, delta16_len, delta32_len, delta64_len, delta128_len, delta256_len;
 
 //the bitmasks, initialized in init_my_alloc
-int mask8, mask16, mask32, mask64, mask128;
-
+unsigned int mask8, mask16, mask32, mask64, mask128, mask256;
+//length of the ones in the bitmasks, used to get the right index of the blocks in the bitmap
+unsigned char mask8_len, mask16_len, mask32_len, mask64_len, mask128_len, mask256_len;
 
 //returns the index of the first free position where the given mask fits, -1 is mask never fits
-signed char getIndexFromBitmap(uint64_t bitmap, int mask, char delta[], char deltaLen);
+signed char getIndexFromBitmap(uint64_t bitmap, unsigned int mask, unsigned char mask_len, char delta[], unsigned char deltaLen);
 
 /* Trivialimplementierung, die Speicher nicht re-cycle-t
    und auf das Alignment keine Ruecksicht nimmt
 */
 
 void init_my_alloc() {
-    //initialize the delta array lengths
+    //initialize the delta array lengths, could be calculated if static memory is not enough
     delta8_len = sizeof(delta8) / sizeof(delta8[0]);
     delta16_len = sizeof(delta16) / sizeof(delta16[0]);
     delta32_len = sizeof(delta32) / sizeof(delta32[0]);
     delta64_len = sizeof(delta64) / sizeof(delta64[0]);
     delta128_len = sizeof(delta128) / sizeof(delta128[0]);
+    delta256_len = sizeof(delta256) / sizeof(delta256[0]);
 
+    //the length of the masks are calculated to be blocksize/4 + 1
+    mask8_len = 8/4 + 1;
+    mask16_len = 16/4 + 1;
+    mask32_len = 32/4 + 1;
+    mask64_len = 64/4 + 1;
+    mask128_len = 128/4 + 1;
+    mask256_len = 256/4 + 1;
     //the masks are set to size/4 + 1 ones on the LSB
-    mask8 = (1 << (8/4 + 1)) - 1;
-    mask16 = (1 << (16/4 + 1)) - 1;
-    mask32 = (1 << (32/4 + 1)) - 1;
-    mask64 = (1 << (64/4 + 1)) - 1;
-    mask128 = (1 << (128/4 + 1)) - 1;
+    mask8 = (1 << mask8_len) - 1;
+    mask16 = (1 << mask16_len) - 1;
+    mask32 = (1 << mask32_len) - 1;
+    mask64 = (1 << mask64_len) - 1;
+    mask128 = (1 << mask128_len) - 1;
+    mask256 = (1 << mask256_len) - 1;
 }
 
 void* my_alloc(size_t size) {
@@ -60,11 +71,16 @@ void* my_alloc(size_t size) {
 void my_free(void* ptr) {
 }
 
-signed char getIndexFromBitmap(uint64_t bitmap, int mask, char delta[], char deltaLen){
-    signed char index = 0;
-    for (; (bitmap & mask == 0) && (index < deltaLen); index++) {
+//returns the index of the value of the block in the bitmap, e.g. 0 for the first block of size 8,
+//1 for the second block of size 8, 2 for the first block of size 16 and so on...
+signed char getIndexOfBlockInBitmap(uint64_t bitmap, int mask, unsigned char mask_len, char delta[], char deltaLen) {
+    signed char delta_sum = 0; //keeps track over the whole shift width
+    int index = 0;
+    //bitmap & mask is only 0 if the block is empty, i.e. bitmap is filled with 0 in this area so no memory was allocated there
+    for (; bitmap & mask && (index < deltaLen); index++) {
         mask <<= delta[index];
+        delta_sum += delta[index];
     }
     if (index >= deltaLen) return -1;
-    return index;
+    return delta_sum + mask_len - 1;
 }
