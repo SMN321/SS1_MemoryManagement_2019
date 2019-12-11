@@ -28,10 +28,10 @@ unsigned int mask8, mask16, mask32, mask64, mask128, mask256;
 unsigned char mask8_len, mask16_len, mask32_len, mask64_len, mask128_len, mask256_len;
 
 //the offset measured in bytes from the pointer where the bitmap lies to the returned pointer if memory is allocated
-unsigned char return_pointer_offset[] = {8, 16, 8, 24, 32, 24, 8, 40, 48, 40, 56, 64, 56, 40, 8, 72, 80, 72, 88, 96, 88,
-                                         72, 104, 112, 104, 120, 128, 120, 104, 72, 8, 136, 144, 136, 152, 160, 152, 136,
-                                         168, 176, 168, 184, 192, 184, 168, 136, 200, 208, 200, 216, 224, 216, 200, 232,
-                                         240, 232, 248, 256, 248, 232, 200, 136, 8};
+unsigned char return_pointer_offset[] = {0, 8, 0, 16, 24, 16, 0, 32, 40, 32, 48, 56, 48, 32, 0, 64, 72, 64, 80, 88, 80,
+                                         64, 96, 104, 96, 112, 120, 112, 96, 64, 0, 128, 136, 128, 144, 152, 144, 128,
+                                         160, 168, 160, 176, 184, 176, 160, 128, 192, 200, 192, 208, 216, 208, 192, 224,
+                                         232, 224, 240, 248, 240, 224, 192, 128, 0};
 
 //returns the index of the first free position where the given mask fits, -1 is mask never fits
 signed char getIndexFromBitmap(uint64_t bitmap, unsigned int mask, unsigned char mask_len, char delta[], unsigned char deltaLen);
