@@ -6,6 +6,8 @@
 static size_t offset = 0;
 static char* data = 0;
 
+//the uint64_t which stores the bitmap for the given block of 256 byte is stored at the beginning of each block
+
 //arrays which hold the distance between two consecutive mask placements
 //do something like (mask <<= delta[i]) and reuse mask, char[] to safe memory
 //the initial place of the mask is with zero shift and has to be used before the delta-array is used, equivalently
@@ -24,6 +26,12 @@ unsigned char delta8_len, delta16_len, delta32_len, delta64_len, delta128_len, d
 unsigned int mask8, mask16, mask32, mask64, mask128, mask256;
 //length of the ones in the bitmasks, used to get the right index of the blocks in the bitmap
 unsigned char mask8_len, mask16_len, mask32_len, mask64_len, mask128_len, mask256_len;
+
+//the offset measured in bytes from the pointer where the bitmap lies to the returned pointer if memory is allocated
+unsigned char return_pointer_offset[] = {8, 16, 8, 24, 32, 24, 8, 40, 48, 40, 56, 64, 56, 40, 8, 72, 80, 72, 88, 96, 88,
+                                         72, 104, 112, 104, 120, 128, 120, 104, 72, 8, 136, 144, 136, 152, 160, 152, 136,
+                                         168, 176, 168, 184, 192, 184, 168, 136, 200, 208, 200, 216, 224, 216, 200, 232,
+                                         240, 232, 248, 256, 248, 232, 200, 136, 8};
 
 //returns the index of the first free position where the given mask fits, -1 is mask never fits
 signed char getIndexFromBitmap(uint64_t bitmap, unsigned int mask, unsigned char mask_len, char delta[], unsigned char deltaLen);
