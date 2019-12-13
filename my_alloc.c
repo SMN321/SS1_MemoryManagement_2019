@@ -58,46 +58,8 @@ void* my_alloc(size_t size) {
 #ifdef DEBUG
         LOG(" last header in page: address: %x, size: %d, address of next package: %x\n", current_header, current_header->size, current_header->next);
 #endif
-        /*
-        for (; offset < max_offset; offset += package_size) {
-            *((header *) (page + offset)) = {size, (struct header *) (page + offset + package_size)};
-        }
-        *((header *) (page + offset)) = (header) {size, NULL};
-        */
         first_p = (header *) page;
     }
-    /*
-    if (!first_p->next) {
-#ifdef DEBUG
-        LOGT("new page ordered because of !first_p->next\n");
-#endif
-        char *page = get_block_from_system();
-        int package_size = size + header_size;
-        int max_offset = (BLOCKSIZE/package_size -1) * package_size;
-        char *max_package = ((size_t) page) + ((size_t) max_offset);
-        char *current_package = page;
-        header *current_header;
-        while (current_package < max_package) {
-            current_header = current_package;
-            *current_header = (header) {size, (struct header *) (current_package + package_size)};
-#ifdef DEBUG
-            LOG("address: %x, size: %d, address of next package: %x\n", current_header, current_header->size, current_header->next);
-#endif
-            current_package += package_size;
-        }
-        current_header = current_package;
-        *current_header = (header) {size, NULL};
-#ifdef DEBUG
-        LOG("address: %x, size: %d, address of next package: %x\n", current_header, current_header->size, current_header->next);
-#endif
-
-        //for (; offset < max_offset; offset += package_size) {
-        //    *((header *) (page + offset)) = {size, (struct header *) (page + offset + package_size)};
-        //}
-        //*((header *) (page + offset)) = (header) {size, NULL};
-
-        first_p->next = (header *) page;
-    }*/
     headers[index] = first_p->next;
     first_p->next = NULL;
     return first_p + 1; //+1 is implicitly converted to +header_size
