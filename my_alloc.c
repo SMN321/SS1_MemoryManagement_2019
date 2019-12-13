@@ -14,22 +14,26 @@ typedef struct header{
 } header;
 
 //stores pointers to the lists of free header
-header *headers[256/8];
+header *headers[256/16+1];
 
 int header_size = 0;
 
 void init_my_alloc() {
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < (256/16+1); ++i) {
         headers[i] = NULL;
     }
     header_size = sizeof(header);
 }
 
 void* my_alloc(size_t size) {
-    int index = size / 8 - 1; //log2(size) - 3;
+    int index = size / 16;
+    int size_normalized = ((size-1) / 16 + 1) * 16; //pow(2, index + 3);
+    if (size_normalized == 0) {
+        size_normalized = 8;
+    }
     header *first_p = headers[index];
 #ifdef DEBUG
-    LOG("malloc was called with size %d, first_p: %x\n", size, first_p);
+    LOG("malloc was called with size %d, first_p: %x, index: %d, size_normalized: %d\n", size, first_p, index, size_normalized);
 #endif
     //empty bucket
     if (!first_p ) {
@@ -40,21 +44,21 @@ void* my_alloc(size_t size) {
 #ifdef DEBUG
         LOG("page: %x, page + BLOCKSIZE: %x\n", page, page + BLOCKSIZE);
 #endif
-        int package_size = size + header_size;
+        int package_size = size_normalized + header_size;
         int max_offset = (BLOCKSIZE/package_size -1) * package_size;
         char *max_package = ((size_t) page) + ((size_t) max_offset);
         char *current_package = page;
         header *current_header;
         while (current_package < max_package) {
             current_header = current_package;
-            *current_header = (header) {size, (struct header *) (current_package + package_size)};
+            *current_header = (header) {size_normalized, (struct header *) (current_package + package_size)};
 #ifdef DEBUG
             LOG("address: %x, size: %d, address of next package: %x\n", current_header, current_header->size, current_header->next);
 #endif
             current_package += package_size;
         }
         current_header = current_package;
-        *current_header = (header) {size, NULL};
+        *current_header = (header) {size_normalized, NULL};
 #ifdef DEBUG
         LOG(" last header in page: address: %x, size: %d, address of next package: %x\n", current_header, current_header->size, current_header->next);
 #endif
@@ -70,9 +74,9 @@ void my_free(void* ptr) {
     LOG("free was called with pointer to %x\n", ptr);
 #endif
     header *header_of_ptr = (header *) (((char *) ptr) - header_size);
-    int index  = header_of_ptr->size / 8 - 1;//log2(header_of_ptr->size) - 3; //find the size of the memory that ptr points to
+    int index  = (header_of_ptr->size) / 16;//log2(header_of_ptr->size) - 3; //find the size of the memory that ptr points to
 #ifdef DEBUG
-    LOG("address of header_of_ptr: %x, size: %d, address of next package: %x\n", header_of_ptr, header_of_ptr->size, header_of_ptr->next);
+    LOG("address of header_of_ptr: %x, size: %d, index: %d, address of next package: %x\n", header_of_ptr, header_of_ptr->size, index, header_of_ptr->next);
     LOG("currently headers[%d] points to %x\n", index, headers[index]);
 #endif
     //append header_of_pointer to the front of headers

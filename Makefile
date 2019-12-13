@@ -3,7 +3,7 @@ Objects :=	$(patsubst %.c,%.o,$(Sources))
 Target :=	testit
 CC :=		gcc
 CFLAGS :=	-g -Wall -std=gnu11
-LDFLAGS :=	-lm
+#LDFLAGS :=	-lm
 $(Target):	$(Objects)
 .PHONY:		clean depend realclean
 clean:
