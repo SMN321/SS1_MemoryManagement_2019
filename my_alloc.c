@@ -66,6 +66,7 @@ void* my_alloc(size_t size) {
         */
         first_p = (header *) page;
     }
+    /*
     if (!first_p->next) {
 #ifdef DEBUG
         LOGT("new page ordered because of !first_p->next\n");
@@ -89,14 +90,14 @@ void* my_alloc(size_t size) {
 #ifdef DEBUG
         LOG("address: %x, size: %d, address of next package: %x\n", current_header, current_header->size, current_header->next);
 #endif
-        /*
-        for (; offset < max_offset; offset += package_size) {
-            *((header *) (page + offset)) = {size, (struct header *) (page + offset + package_size)};
-        }
-        *((header *) (page + offset)) = (header) {size, NULL};
-        */
+
+        //for (; offset < max_offset; offset += package_size) {
+        //    *((header *) (page + offset)) = {size, (struct header *) (page + offset + package_size)};
+        //}
+        //*((header *) (page + offset)) = (header) {size, NULL};
+
         first_p->next = (header *) page;
-    }
+    }*/
     headers[index] = first_p->next;
     first_p->next = NULL;
     return first_p + 1; //+1 is implicitly converted to +header_size
