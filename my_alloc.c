@@ -1,28 +1,46 @@
 #include <stdlib.h>
 #include "my_alloc.h"
 #include "my_system.h"
-#include <math.h>
 #include <stdio.h>
 
 #define LOG(format, vars...) printf(format, vars)
 #define LOGT(text) printf(text)
 //#define DEBUG
 
+//store the size of the block in the MSP of the pointer
+//all pointers are multiple of 8 hence the 3 LSB are unused
+//to encode the size we need 5 bit
+//with the 3 bit from the MSB we only have to safe the 2 MSB from a pointer and hope that they are the same for all others
+typedef void* sizePointer;
+
 typedef struct header{
-    unsigned int size;
-    struct header *next;
+    sizePointer info;
 } header;
 
+__uint64_t pointer_msb = 0;
+__uint64_t lower62 = ~(3 << 62);
+__uint64_t size_mask = 0b11111 << 3;
+
+void *get_pointer_from_size_pointer(sizePointer pointer) {
+    return (void *) (pointer_msb | (lower62 & (((__uint64_t) pointer) << 3)));
+}
+
+int get_size_from_size_pointer(sizePointer pointer) {
+    return (int) (size_mask & ((__uint64_t) pointer >> 59));
+}
+//TODO: test functions
 //stores pointers to the lists of free header
 header *headers[256/16+1];
 
 int header_size = 0;
 
 void init_my_alloc() {
+
     for (int i = 0; i < (256/16+1); ++i) {
         headers[i] = NULL;
     }
     header_size = sizeof(header);
+
 }
 
 void* my_alloc(size_t size) {
