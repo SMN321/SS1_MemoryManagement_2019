@@ -1,3 +1,14 @@
-cmake_minimum_required(VERSION 2.8.9)
-project(SS1_MemoryManagement_2019)
-add_executable(testit testit.c my_alloc.c my_system.c)
+cmake_minimum_required(VERSION 3.10)
+project(testumgebung)
+
+set(CMAKE_CXX_STANDARD 14)
+
+include_directories(.)
+
+add_executable(testumgebung
+        Makefile
+        my_alloc.c
+        my_alloc.h
+        my_system.c
+        my_system.h
+        testit.c)

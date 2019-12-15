@@ -1,27 +1,244 @@
 #include <stdlib.h>
 #include "my_alloc.h"
 #include "my_system.h"
+#include <stdio.h>
 
-static size_t offset = 0;
-static char* data = 0;
+#define DIFFSIZES (32)
+int anz = 0;
 
-/* Trivialimplementierung, die Speicher nicht re-cycle-t
-   und auf das Alignment keine Ruecksicht nimmt
-*/
+typedef struct header {
+    __uint8_t nextSize; //data or free after header: size from 0 to 255
+    __uint8_t nextFree; //bool for data or free after header
+    __uint8_t prevSize; //data or free before header: size from 0 to 255
+    __uint8_t prevFree; //bool for data or free before header
+    __uint8_t startOfBlock; //bool for is header at start of block
+    __uint8_t endOfBlock; //bool for is header at end of block
+    __uint8_t curLastInBlock; //bool for is header last header in block
+    __uint8_t dummy; //sizeof(header)%8 has to be 0
+} header;
+size_t header_size = sizeof(header);
+
+typedef struct freespace {
+    struct freespace *nextfree;
+    struct freespace *prevfree;
+} freespace;
+size_t freespace_size = sizeof(freespace);
+
+unsigned int leftSpaceInBlock = BLOCKSIZE;
+
+freespace *freelist[DIFFSIZES];
+
+void linkFreeToList(freespace *free, int size) {
+    //add at front
+    freespace *list = freelist[size/8 - 1];
+    free->nextfree = list;
+    free->prevfree = NULL;
+    if(free->nextfree) {
+        free->nextfree->prevfree = free;
+    }
+    freelist[size/8 - 1] = free;
+
+}
+
+void deleteFreeFromList(freespace *wasfree, int size) {
+    if(wasfree->nextfree) {
+        //wasfree not end of list
+        wasfree->nextfree->prevfree = wasfree->prevfree;
+    } //else: wasfree end of list and therefore wasfree->nextfree is NULL
+    if(wasfree->prevfree) {
+        //wasfree not start of list
+        wasfree->prevfree->nextfree = wasfree->nextfree;
+    } else {
+        //wasfree start of list
+        freelist[size/8 - 1] = wasfree->nextfree;
+    }
+}
+
+void addHeader(header *h, __uint16_t nextsize, __uint8_t nextFree, __uint16_t prevsize, __uint8_t prevFree,
+               __uint8_t startOfBlock, __uint8_t endOfBlock, __uint8_t curLastInBlock) {
+    h->nextSize = nextsize -1;
+    h->nextFree = nextFree;
+    h->prevSize = prevsize -1;
+    h->prevFree = prevFree;
+    h->startOfBlock = startOfBlock;
+    h->endOfBlock = endOfBlock;
+    h->curLastInBlock = curLastInBlock;
+}
+
+void addHeaderWithFreespace(header *h, __uint16_t prevsize, __uint8_t prevFree,
+                            __uint8_t startOfBlock, __uint8_t endOfBlock, __uint8_t curLastInBlock,
+                            int freeSize) {
+    //add header with freespace
+    addHeader(h, freeSize, 1, prevsize, prevFree, startOfBlock, endOfBlock, curLastInBlock);
+    freespace *freeAfterHeader = (freespace *)((char *)h + header_size);
+    linkFreeToList(freeAfterHeader, freeSize);
+
+    //update header after freespace
+    if(!h->endOfBlock) {
+        header *headerAfterFree = (header *)((char *)freeAfterHeader + freeSize);
+        headerAfterFree->prevFree = 1;
+        headerAfterFree->prevSize = freeSize -1;
+    }
+}
+
+void addHeaderWithOversizedFreespace(header *h, int freeSize, __uint8_t endOfBlock) {
+    while(freeSize - 256 >= header_size + freespace_size) {
+        //freespace can be split
+        addHeaderWithFreespace(h, h->prevSize+1, h->prevFree,
+                               h->startOfBlock, 0, 0, 256);
+        freeSize -= 256;
+        h = (header *)((char *)h + header_size + 256);
+        h->prevSize = 255;
+        h->prevFree = 1;
+    }
+    addHeaderWithFreespace(h, h->prevSize+1, h->prevFree,
+                           h->startOfBlock, endOfBlock, endOfBlock, freeSize);
+
+}
+
+void replaceFreeSpaceWithData(freespace *free, int dataSize) {
+    header *headerBeforeFreespace = (header *)((char *)free - header_size);
+    if(dataSize == 8) {
+        //FIXME: change freespace so that freespace_size is 8Byte
+        dataSize = 16;
+    }
+    int freeSize = headerBeforeFreespace->nextSize +1;
+    deleteFreeFromList(free, freeSize);
+
+    if(freeSize - dataSize < header_size + freespace_size) {
+        //perfect fit or not enough space left for additional header and freespace
+        dataSize = freeSize;
+
+        //update header after data
+        if(!headerBeforeFreespace->endOfBlock) {
+            //there is a header after the inserted data
+            header *headerAfterData = (header *)((char *)free + dataSize);
+            headerAfterData->prevFree = 0;
+            headerAfterData->prevSize = dataSize -1;
+            if(headerBeforeFreespace->curLastInBlock) {
+                //the header after the inserted data becomes the current last header in block
+                headerBeforeFreespace->curLastInBlock = 0;
+                int take = leftSpaceInBlock;
+                if(take > 256) {
+                    take = 256;
+                }
+                leftSpaceInBlock -= header_size + take;
+                __uint8_t endOfBlock = 0;
+                if(leftSpaceInBlock < header_size + freespace_size) {
+                    endOfBlock = 1;
+                }
+                addHeaderWithFreespace(headerAfterData, headerAfterData->prevSize+1, headerAfterData->prevFree, 0, endOfBlock, 1, take);
+            }
+        }
+    } else {
+        //enough space left for additional header and freespace
+        header *headerAfterData = (header *)((char *)free + dataSize);
+        int leftSize = freeSize - (dataSize + header_size);
+        int take = leftSize;
+        u_int8_t endOfBlock = headerBeforeFreespace->endOfBlock;
+        if(headerBeforeFreespace->curLastInBlock && !headerBeforeFreespace->endOfBlock) {
+            take += leftSpaceInBlock;
+            if(take > 256) {
+                take = 256;
+            }
+            if(leftSpaceInBlock - (take - leftSize) < header_size + freespace_size) {
+                endOfBlock = 1;
+            }
+        }
+        leftSpaceInBlock -= take - leftSize;
+        addHeaderWithFreespace(headerAfterData, dataSize, 0, 0, endOfBlock, headerBeforeFreespace->curLastInBlock, take);
+        headerBeforeFreespace->curLastInBlock = 0;
+        headerBeforeFreespace->endOfBlock = 0;
+    }
+
+    //update header before data and delete freespace
+    headerBeforeFreespace->nextSize = dataSize -1;
+    headerBeforeFreespace->nextFree = 0;
+
+}
+
+void newBlock() {
+    //get block
+    header *firstHeaderInBlock = get_block_from_system();
+    leftSpaceInBlock = BLOCKSIZE;
+
+    //add header with freespace
+    int freeSize = DIFFSIZES*8;
+    addHeaderWithFreespace(firstHeaderInBlock, 0, 0, 1, 0, 1, freeSize);
+    leftSpaceInBlock -= header_size + freeSize;
+}
 
 void init_my_alloc() {
 }
 
 void* my_alloc(size_t size) {
-   char* ret;
-   if (!data || offset + size > BLOCKSIZE) {
-      offset = 0;
-      data = get_block_from_system();
-   }
-   ret = data + offset;
-   offset += size;
-   return ret;
+    //TODO: find error !!! (e.g. 1 1000000 uniform oneinthree (even without my_free))
+    //ideas: wrong numbers, losing information in header
+
+    void *ret = NULL;
+
+    anz++;
+    printf("anz: %d, size: %lu\n", anz, size);
+    //search for free space
+    int i = size / 8 - 1;
+    for (; i < DIFFSIZES && !ret; i++) {
+        ret = freelist[i];
+    }
+    if (!ret) {
+        //no free space found -> new block
+        newBlock();
+        ret = freelist[DIFFSIZES - 1];
+    }
+
+    //free space available
+    replaceFreeSpaceWithData(ret, size);
+
+    return ret;
 }
 
 void my_free(void* ptr) {
+    //TODO: find error !!! (e.g. 1 1000000 fixed16 oneinthree (without my_free working))
+    //ideas: wrong numbers, losing information in header
+
+    header *headerOfPtr = ptr - header_size/8;
+    header *headerAfterPtr = NULL;
+    header *headerOfPtr_prev = NULL;
+
+    if(!headerOfPtr->startOfBlock) {
+        headerOfPtr_prev = (header *)((char *)headerOfPtr - headerOfPtr->prevSize -1 - header_size);
+    }
+    if(!headerOfPtr->endOfBlock) {
+        headerAfterPtr = (header *)((char *)ptr + headerOfPtr->nextSize +1);
+    }
+
+    if(headerAfterPtr && headerAfterPtr->nextFree && headerOfPtr_prev && headerOfPtr_prev->nextFree) {
+        //space before and behind is free
+        freespace *freeAfter = (freespace *)((char *)headerAfterPtr + header_size);
+        deleteFreeFromList(freeAfter, headerAfterPtr->nextSize +1);
+
+        freespace *freeBefore = (freespace *)((char *)headerOfPtr_prev + header_size);
+        deleteFreeFromList(freeBefore, headerOfPtr_prev->nextSize +1);
+
+        addHeaderWithOversizedFreespace(headerOfPtr_prev,
+                headerOfPtr_prev->nextSize +1 + header_size + headerOfPtr->nextSize +1 + header_size + headerAfterPtr->nextSize +1,
+                headerAfterPtr->endOfBlock);
+    } else if(headerAfterPtr && headerAfterPtr->nextFree) {
+        //space behind is free
+        freespace *freeAfter = (freespace *)((char *)headerAfterPtr + header_size);
+        deleteFreeFromList(freeAfter, headerAfterPtr->nextSize +1);
+        addHeaderWithOversizedFreespace(headerOfPtr, headerOfPtr->nextSize +1 + header_size + headerAfterPtr->nextSize +1,
+                headerAfterPtr->endOfBlock);
+    } else if(headerOfPtr_prev && headerOfPtr_prev->nextFree) {
+        //space before is free
+        freespace *freeBefore = (freespace *)((char *)headerOfPtr_prev + header_size);
+        deleteFreeFromList(freeBefore, headerOfPtr_prev->nextSize +1);
+        addHeaderWithOversizedFreespace(headerOfPtr_prev, headerOfPtr_prev->nextSize +1 + header_size + headerOfPtr->nextSize +1,
+                headerOfPtr->endOfBlock);
+    } else {
+        //no space before or behind free
+        addHeaderWithFreespace(headerOfPtr, headerOfPtr->prevSize+1, headerOfPtr->prevFree,
+                headerOfPtr->startOfBlock, headerOfPtr->endOfBlock, headerOfPtr->curLastInBlock, headerOfPtr->nextSize+1);
+
+    }
+
 }
