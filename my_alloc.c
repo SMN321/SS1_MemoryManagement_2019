@@ -103,10 +103,6 @@ void* my_alloc(size_t size) {
 #endif
             block += package_size;
             next_header += package_size;
-            /*printf("block: %x\n", block + i);
-            printf("next_header: %x\n", next_header + i);
-            printf("header: %x\n", ((header *) block)->info);
-             */
         }
         ((header *) block)->info = build_size_pointer(size, NULL);
 #ifdef DEBUG
