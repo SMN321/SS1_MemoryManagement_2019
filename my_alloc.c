@@ -1,18 +1,19 @@
 #include <stdlib.h>
+#include <stdint.h>
 #include "my_alloc.h"
 #include "my_system.h"
 
 #define DIFFSIZES (32)
 
 typedef struct header {
-    __uint8_t nextSize; //data or free after header: size from 0 to 255
-    __uint8_t nextFree; //bool for data or free after header
-    __uint8_t prevSize; //data or free before header: size from 0 to 255
-    __uint8_t prevFree; //bool for data or free before header
-    __uint8_t startOfBlock; //bool for is header at start of block
-    __uint8_t endOfBlock; //bool for is header at end of block
-    __uint8_t curLastInBlock; //bool for is header last header in block
-    __uint8_t dummy; //sizeof(header)%8 has to be 0
+    uint8_t nextSize; //data or free after header: size from 0 to 255
+    uint8_t nextFree; //bool for data or free after header
+    uint8_t prevSize; //data or free before header: size from 0 to 255
+    uint8_t prevFree; //bool for data or free before header
+    uint8_t startOfBlock; //bool for is header at start of block
+    uint8_t endOfBlock; //bool for is header at end of block
+    uint8_t curLastInBlock; //bool for is header last header in block
+    uint8_t dummy; //sizeof(header)%8 has to be 0
 } header;
 size_t header_size = sizeof(header);
 
@@ -51,8 +52,8 @@ void deleteFreeFromList(freespace *wasfree, int size) {
     }
 }
 
-void addHeader(header *h, __uint16_t nextsize, __uint8_t nextFree, __uint16_t prevsize, __uint8_t prevFree,
-               __uint8_t startOfBlock, __uint8_t endOfBlock, __uint8_t curLastInBlock) {
+void addHeader(header *h,  uint16_t nextsize,  uint8_t nextFree,  uint16_t prevsize,  uint8_t prevFree,
+                uint8_t startOfBlock,  uint8_t endOfBlock,  uint8_t curLastInBlock) {
     h->nextSize = nextsize -1;
     h->nextFree = nextFree;
     h->prevSize = prevsize -1;
@@ -62,8 +63,8 @@ void addHeader(header *h, __uint16_t nextsize, __uint8_t nextFree, __uint16_t pr
     h->curLastInBlock = curLastInBlock;
 }
 
-void addHeaderWithFreespace(header *h, __uint16_t prevsize, __uint8_t prevFree,
-                            __uint8_t startOfBlock, __uint8_t endOfBlock, __uint8_t curLastInBlock,
+void addHeaderWithFreespace(header *h,  uint16_t prevsize,  uint8_t prevFree,
+                             uint8_t startOfBlock,  uint8_t endOfBlock,  uint8_t curLastInBlock,
                             int freeSize) {
     //add header with freespace
     addHeader(h, freeSize, 1, prevsize, prevFree, startOfBlock, endOfBlock, curLastInBlock);
@@ -78,7 +79,7 @@ void addHeaderWithFreespace(header *h, __uint16_t prevsize, __uint8_t prevFree,
     }
 }
 
-void addHeaderWithOversizedFreespace(header *h, int freeSize, __uint8_t endOfBlock) {
+void addHeaderWithOversizedFreespace(header *h, int freeSize,  uint8_t endOfBlock) {
     while(freeSize - 256 - (int)header_size >= (int)(header_size + freespace_size)) {
         //freespace can be split
         addHeaderWithFreespace(h, h->prevSize+1, h->prevFree,
@@ -133,7 +134,7 @@ void replaceFreeSpaceWithData(freespace *free, int dataSize) {
                     take = 256;
                 }
                 leftSpaceInBlock -= take;
-                __uint8_t endOfBlock = 0;
+                 uint8_t endOfBlock = 0;
                 if(leftSpaceInBlock < (int)(header_size + freespace_size)) {
                     endOfBlock = 1;
                 }
@@ -145,7 +146,7 @@ void replaceFreeSpaceWithData(freespace *free, int dataSize) {
         header *headerAfterData = (header *)((char *)free + dataSize);
         int leftSize = freeSize - (dataSize + header_size);
         int take = leftSize;
-        u_int8_t endOfBlock = headerBeforeFreespace->endOfBlock;
+        uint8_t endOfBlock = headerBeforeFreespace->endOfBlock;
         if(headerBeforeFreespace->curLastInBlock && !headerBeforeFreespace->endOfBlock) {
             take += leftSpaceInBlock;
             if(take > 256) {
