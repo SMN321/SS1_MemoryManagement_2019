@@ -6,8 +6,6 @@
 #define DIFFSIZES (32)
 int anz = 0;
 
-//TODO: find error !!!
-
 typedef struct header {
     __uint8_t nextSize; //data or free after header: size from 0 to 255
     __uint8_t nextFree; //bool for data or free after header
@@ -84,7 +82,6 @@ void addHeaderWithFreespace(header *h, __uint16_t prevsize, __uint8_t prevFree,
 }
 
 void addHeaderWithOversizedFreespace(header *h, int freeSize, __uint8_t endOfBlock) {
-    //TODO: error here
     while(freeSize - 256 >= (int)(header_size + freespace_size)) {
         //freespace can be split
         addHeaderWithFreespace(h, h->prevSize+1, h->prevFree,
