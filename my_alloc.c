@@ -107,7 +107,6 @@ void addHeaderWithOversizedFreespace(header *h, int freeSize, __uint8_t endOfBlo
 void replaceFreeSpaceWithData(freespace *free, int dataSize) {
     header *headerBeforeFreespace = (header *)((char *)free - header_size);
     if(dataSize == 8) {
-        //FIXME: change freespace so that freespace_size is 8Byte (or safe 8Byte in extra Block)
         dataSize = 16;
     }
     int freeSize = headerBeforeFreespace->nextSize +1;
@@ -136,7 +135,6 @@ void replaceFreeSpaceWithData(freespace *free, int dataSize) {
                 leftSpaceInBlock -= take;
                 __uint8_t endOfBlock = 0;
                 if(leftSpaceInBlock < (int)(header_size + freespace_size)) {
-                    //FIXME: losing memory
                     endOfBlock = 1;
                 }
                 addHeaderWithFreespace(headerAfterData, headerAfterData->prevSize+1, headerAfterData->prevFree, 0, endOfBlock, 1, take);
@@ -204,38 +202,7 @@ void* my_alloc(size_t size) {
 }
 
 void my_free(void* ptr) {
-    //TODO: less points after combining freespaces ???
-
-    /*
     header *headerOfPtr = (header *)((char *)ptr - header_size);
-    header * freeHeader = (header *)((char *)ptr - header_size);
-    int freeSize = header_size + headerOfPtr->nextSize +1;
-    int free = 1;
-
-    //"go right"
-    while (!headerOfPtr->endOfBlock) {
-        headerOfPtr = (header *)((char *)headerOfPtr + header_size + headerOfPtr->nextSize +1);
-        if(headerOfPtr->nextFree) {
-            deleteFreeFromList((freespace *)((char *)headerOfPtr + header_size), headerOfPtr->nextSize +1);
-            freeSize += header_size + headerOfPtr->nextSize + 1;
-        } else {
-            free = 0;
-            break;
-        }
-    }
-
-    //"go left"
-    while (!freeHeader->startOfBlock && freeHeader->prevFree) {
-        freeHeader = (header *)((char *)freeHeader - freeHeader->prevSize -1 - header_size);
-        deleteFreeFromList((freespace *)((char *)freeHeader + header_size), freeHeader->nextSize +1);
-        freeSize += header_size + freeHeader->nextSize +1;
-    }
-
-    addHeaderWithOversizedFreespace(freeHeader, freeSize, free);
-    */
-
-    header *headerOfPtr = (header *)((char *)ptr - header_size);
-    //no space before or behind free
     addHeaderWithFreespace(headerOfPtr, headerOfPtr->prevSize+1, 0,
                            headerOfPtr->startOfBlock, headerOfPtr->endOfBlock, headerOfPtr->curLastInBlock, headerOfPtr->nextSize+1);
 }
