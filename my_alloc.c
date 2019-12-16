@@ -103,6 +103,8 @@ void replaceFreeSpaceWithData(freespace *free, int dataSize) {
         dataSize = 16;
     }
     int freeSize = headerBeforeFreespace->nextSize +1;
+
+    //delete freespace
     deleteFreeFromList(free, freeSize);
 
     if(freeSize - dataSize < (int)(header_size + freespace_size)) {
@@ -157,7 +159,7 @@ void replaceFreeSpaceWithData(freespace *free, int dataSize) {
         headerBeforeFreespace->endOfBlock = 0;
     }
 
-    //update header before data and delete freespace
+    //update header before data
     headerBeforeFreespace->nextSize = dataSize -1;
     headerBeforeFreespace->nextFree = 0;
 
@@ -219,6 +221,7 @@ void my_free(void* ptr) {
         headerAfterPtr = (header *)((char *)ptr + headerOfPtr->nextSize +1);
     }
 
+    /*
     if(headerAfterPtr && headerAfterPtr->nextFree && headerOfPtr_prev && headerOfPtr_prev->nextFree) {
         //space before and behind is free
         printf("space before and behind is free\n");
@@ -248,8 +251,10 @@ void my_free(void* ptr) {
     } else {
         //no space before or behind free
         printf("no space before or behind free\n");
+        */
         addHeaderWithFreespace(headerOfPtr, headerOfPtr->prevSize+1, 0,
                 headerOfPtr->startOfBlock, headerOfPtr->endOfBlock, headerOfPtr->curLastInBlock, headerOfPtr->nextSize+1);
 
-    }
+    //}
+
 }
